@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CSV Bulk Upload Final Grades</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-100 p-10">
+    <div class="max-w-md mx-auto bg-white p-6 rounded-xl shadow">
+      <h1 class="text-xl font-bold mb-4 text-gray-700">
+        Upload Final Grades CSV
+      </h1>
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-600 mb-2"
+          >Select CSV File:</label
+        >
+        <input
+          type="file"
+          id="csvFile"
+          accept=".csv"
+          class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+        />
+      </div>
+
+      <button
+        id="uploadBtn"
+        class="bg-green-600 text-white px-4 py-2 rounded font-semibold w-full hover:bg-green-700"
+      >
+        Upload Final Grades to Firestore
+      </button>
+    </div>
+
+    <script type="module">
+      import { db } from "/js/firebase-config.js";
+      import {
+        doc,
+        setDoc,
+      } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+      document.getElementById("uploadBtn").addEventListener("click", () => {
+        const fileInput = document.getElementById("csvFile");
+
+        if (fileInput.files.length === 0) {
+          alert("Please select a CSV file first!");
+          return;
+        }
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+
+        reader.onload = async function (e) {
+          const text = e.target.result;
+          const rows = text.split("\n");
+
+          // Get headers from first row and clean them up
+          const headers = rows[0].split(",").map((h) => h.trim().toLowerCase());
+
+          console.log("Starting bulk upload for Final Grades...");
+
+          for (let i = 1; i < rows.length; i++) {
+            if (!rows[i].trim()) continue;
+
+            const columns = rows[i].split(",").map((c) => c.trim());
+            const student = {};
+
+            headers.forEach((header, index) => {
+              student[header] = columns[index];
+            });
+
+            if (student.email) {
+              try {
+                // Saving data to Firestore (without midterms)
+                await setDoc(doc(db, "students", student.email), {
+                  name: student.name,
+                  course: student.course,
+                  final: parseFloat(student.final) || student.final,
+                  midterm: "N/A", // Place holder so dashboard.js doesn't crash reading an undefined property
+                });
+                console.log(`✅ Uploaded: ${student.email}`);
+              } catch (error) {
+                console.error(
+                  `❌ Error uploading ${student.email}:`,
+                  error.message,
+                );
+              }
+            }
+          }
+          alert("Final Grade data processing complete!");
+        };
+
+        reader.readAsText(file);
+      });
+    </script>
+  </body>
+</html>
